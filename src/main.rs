@@ -38,7 +38,10 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
         let mut rng = rand::thread_rng();
         let mut already  = Vec::new();
         while nb_yes < 2 && nb_no < 2 {
-            let rand = rng.gen_range(0..nb_arg);
+            let mut rand = rng.gen_range(0..nb_arg);
+            while already.contains(&rand) {
+                rand = rng.gen_range(0..nb_arg);
+            }
             let taeydennae =  Command::new(solver_path.clone())
             .arg("-p")
             .arg("PCA-CO")
@@ -49,10 +52,36 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
             let out = String::from_utf8(taeydennae.stdout).unwrap();
             println!("{:?} {}", out, rand);
             if out.starts_with("YES") {
-                nb_yes +=1;
+                if nb_yes < 2 {
+                    nb_yes +=1;
+                    let mut f = file_output.write().unwrap();
+                    let mut buf = String::from(file_name.to_str().unwrap());
+                    buf.push(';');
+                    buf.push_str("PCA-CO");
+                    buf.push(';');
+                    buf.push_str(rand.to_string().as_str());
+                    buf.push(';');
+                    buf.push_str("YES");
+                    buf.push('\n');
+                    let _ = f.write_all(buf.as_bytes());
+                    drop(f);
+                }
             }
             else if out.starts_with("NO"){
-                nb_no +=1;
+                if nb_no < 2 {
+                    nb_no +=1;
+                    let mut f = file_output.write().unwrap();
+                    let mut buf = String::from(file_name.to_str().unwrap());
+                    buf.push(';');
+                    buf.push_str("PCA-CO");
+                    buf.push(';');
+                    buf.push_str(rand.to_string().as_str());
+                    buf.push(';');
+                    buf.push_str("NO");
+                    buf.push('\n');
+                    let _ = f.write_all(buf.as_bytes());
+                    drop(f);
+                }
             }
             already.push(rand);
             //break;
