@@ -83,6 +83,9 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
                     drop(f);
                 }
             }
+            if !taeydennae.status.success() {
+                break;
+            }
             already.push(rand);
             //break;
         }
