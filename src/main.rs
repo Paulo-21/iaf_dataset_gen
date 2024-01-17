@@ -37,7 +37,7 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
         let nb_arg = find_number_arg(&file_name);
         let mut rng = rand::thread_rng();
         let mut already  = Vec::new();
-        while nb_yes < 2 && nb_no < 2 {
+        while nb_yes < 2 || nb_no < 2 {
             let mut rand = rng.gen_range(0..nb_arg);
             while already.contains(&rand) {
                 rand = rng.gen_range(0..nb_arg);
