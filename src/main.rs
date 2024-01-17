@@ -35,7 +35,6 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
         drop(queue);
         println!("{}", file_name.display());
         let nb_arg = find_number_arg(&file_name);
-        println!("{}", nb_arg);
         let mut rng = rand::thread_rng();
         let mut already  = Vec::new();
         while nb_yes < 2 && nb_no < 2 {
@@ -46,10 +45,9 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
             .arg("-f")
             .arg(file_name.clone())
             .arg("-a")
-            .arg("1").output().unwrap();
+            .arg(rand.to_string()).output().unwrap();
             let out = String::from_utf8(taeydennae.stdout).unwrap();
-            println!("{:?}", out);
-            println!("{:?}", String::from_utf8(taeydennae.stderr));
+            println!("{:?} {}", out, rand);
             if out.starts_with("YES") {
                 nb_yes +=1;
             }
