@@ -1,5 +1,5 @@
-use std::io::{self, stdout, Write};
-use std::fs::{self, DirEntry, File};
+use std::io::Write;
+use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::env;
 use std::process::Command;
@@ -8,7 +8,6 @@ use std::thread;
 use std::thread::available_parallelism;
 use std::sync::{RwLock, Arc};
 use rand::Rng;
-use rand::distributions::{Distribution, Uniform};
 
 fn find_number_arg(file_name : &PathBuf) -> u32 {
     let mut n = 0;
@@ -33,15 +32,17 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
         if (*queue).is_empty() { break; }
         let file_name = (*queue).pop().unwrap();
         drop(queue);
-        println!("{}", file_name.display());
         let nb_arg = find_number_arg(&file_name);
         let mut rng = rand::thread_rng();
         let mut already  = Vec::new();
-        while nb_yes < 2 || nb_no < 2 {
+        let mut _i = 0;
+        //while (nb_yes < 2 || nb_no < 2)  && _i < 100 {
+        while nb_yes < 2 && nb_no < 2 {
             let mut rand = rng.gen_range(0..nb_arg);
             while already.contains(&rand) {
                 rand = rng.gen_range(0..nb_arg);
             }
+            println!("START : {}", file_name.display().to_string().split(['\\', '/']).last().unwrap());
             let taeydennae =  Command::new(solver_path.clone())
             .arg("-p")
             .arg("PCA-CO")
@@ -50,7 +51,7 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
             .arg("-a")
             .arg(rand.to_string()).output().unwrap();
             let out = String::from_utf8(taeydennae.stdout).unwrap();
-            println!("{:?} {}", out, rand);
+            println!("FINISH {} {:?} {}",file_name.display().to_string().split(['\\', '/']).last().unwrap(),  out, rand);
             if out.starts_with("YES") {
                 if nb_yes < 2 {
                     nb_yes +=1;
@@ -88,6 +89,7 @@ fn create_data(lock_file : Arc<RwLock<Vec<PathBuf>>>, file_output : Arc<RwLock<F
             }
             already.push(rand);
             //break;
+            _i+=1;
         }
     }
 }
