@@ -71,11 +71,10 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .arg("--logging-level")
         .arg("off").output().expect("shloud ");
 
-        if child.status.success() {
+        if !child.status.success() {
             let mut r = job_lock.write().unwrap();
             r.stop = true;
         }
-        
         if child.stdout.starts_with(b"YES") {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::IN;
