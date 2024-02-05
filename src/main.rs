@@ -124,13 +124,22 @@ fn main() {
     ).collect();
     //let file_lock_save = Arc::new(RwLock::new(all_file));
     for f in all_file {
+        let mut res_path = PathBuf::from("result");
+        let temp = f.clone();
+        let file_name = temp.to_str().unwrap().split(&['\\', '/']);
+        res_path = res_path.join(file_name.last().unwrap());
+        println!("-----------------------------------------------");
+
+        if res_path.exists() { 
+            println!("{} {} ", f.display(), "already computed".yellow());
+            continue; 
+        }
         let (af, arg_name) = if f.ends_with("af") {
             get_input(f.to_str().unwrap(), Format::CNF)
         }
         else {
             get_input(f.to_str().unwrap(), Format::APX)
         };
-        println!("-----------------------------------------------");
         println!("{}", f.display());
         let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false};
         let job_lock = Arc::new(RwLock::new(job));
@@ -147,6 +156,7 @@ fn main() {
         for t in thread_join_handle {
             let _ = t.join();
         }
+        println!("{}", "done".green());
         let mut res = String::with_capacity(af.nb_argument);
         let w = job_lock.write().unwrap();
         if w.stop { drop(w); continue; }
@@ -156,10 +166,6 @@ fn main() {
                 res.push(',');
             }
         }
-        let mut res_path = PathBuf::from("result");
-        let temp = w.file_path.clone();
-        let file_name = temp.to_str().unwrap().split(&['\\', '/']);
-        res_path = res_path.join(file_name.last().unwrap());
 
         let mut file = File::create(res_path).unwrap();
         file.write_all(res.as_bytes()).unwrap();
