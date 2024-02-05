@@ -7,6 +7,7 @@ use std::str::FromStr;
 use std::thread;
 use std::thread::available_parallelism;
 use std::sync::{RwLock, Arc};
+use std::time::Instant;
 use colored::Colorize;
 use crate::grounded::*;
 use crate::parser::*;
@@ -14,8 +15,6 @@ use crate::parser::*;
 mod grounded;
 mod af;
 mod parser;
-
-
 
 struct Job {
     file_path : PathBuf,
@@ -26,24 +25,12 @@ struct Job {
     stop : bool,
 }
 
-fn find_number_arg(file_name : &PathBuf) -> u32 {
-    let mut n = 0;
-    let file = fs::read_to_string(file_name).unwrap();
-    for line in file.lines() {
-        if line.starts_with("arg") || line.starts_with("?arg") {
-            n+=1;
-        }
-        else {
-            break;
-        }
-    }
-    n
-}
-
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
+    let mut max_time = 1;
     loop {
         let mut r = job_lock.write().unwrap();
-        //if r.stop { break; }
+        if r.stop { break; }
+        max_time = (4*3600) / r.nb_arg;
         if r.nb_arg <= r.step_arg { break; }
         if r.grounded[r.step_arg] != Label::UNDEC {
             //eprintln!("{}","IN GROUNDED".green());
@@ -56,7 +43,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         let file_path  = r.file_path.clone();
         let arg_name = if r.arg_names.is_empty() { arg_id.to_string() }
         else { r.arg_names[arg_id].clone() };
-
+        let start = Instant::now();
         drop(r);
         let child = Command::new(solver_path.clone())
         .arg("solve")
@@ -70,8 +57,9 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .arg(arg_name)
         .arg("--logging-level")
         .arg("off").output().expect("shloud ");
-
-        if !child.status.success() {
+        let time = start.elapsed().as_secs();
+        
+        if !child.status.success() || time > max_time as u64 {
             let mut r = job_lock.write().unwrap();
             r.stop = true;
         }
