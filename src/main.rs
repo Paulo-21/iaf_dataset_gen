@@ -44,7 +44,6 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
     loop {
         let mut r = job_lock.write().unwrap();
         if r.nb_arg <= r.step_arg { break; }
-        println!("{:?}", r.grounded[r.step_arg]);
         if r.grounded[r.step_arg] != Label::UNDEC {
             println!("{}","IN GROUNDED".green());
             (*r).step_arg +=1;
@@ -113,7 +112,6 @@ fn main() {
         };
         println!("-----------------------------------------------");
         println!("{}", f.display());
-
         let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name};
         let job_lock = Arc::new(RwLock::new(job));
         let mut thread_join_handle = Vec::with_capacity(default_parallelism_approx);
@@ -138,7 +136,9 @@ fn main() {
             }
         }
         let mut res_path = PathBuf::from("result");
-        res_path = res_path.join(w.file_path.clone());
+        let temp = w.file_path.clone();
+        let file_name = temp.to_str().unwrap().split(&['\\', '/']);
+        res_path = res_path.join(file_name.last().unwrap());
 
         let mut file = File::create(res_path).unwrap();
         file.write_all(res.as_bytes()).unwrap();

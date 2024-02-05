@@ -46,8 +46,6 @@ pub fn solve(af : &ArgumentationFramework) -> Vec<Label> {
     r
 }
 
-
-
 fn init_labelling2(af : &ArgumentationFramework) -> Vec<usize> {
     let mut label_in : Vec<usize> = Vec::with_capacity(af.nb_argument);
     
