@@ -1,14 +1,16 @@
 use std::io::Write;
+use std::io::Read;
 use std::fs::{self, File};
 use std::path::{Path, PathBuf};
 use std::env;
-use std::process::Command;
+use std::process::{Command, Stdio};
 use std::str::FromStr;
 use std::thread;
 use std::thread::available_parallelism;
 use std::sync::{RwLock, Arc};
-use std::time::Instant;
+use std::time::{Duration, Instant};
 use colored::Colorize;
+use wait_timeout::ChildExt;
 use crate::grounded::*;
 use crate::parser::*;
 
@@ -26,11 +28,12 @@ struct Job {
 }
 
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
-    let mut max_time = 1;
+    let r = job_lock.read().unwrap();
+    let max_time = (4*3600) / r.nb_arg as u64;
+    drop(r);
     loop {
         let mut r = job_lock.write().unwrap();
         if r.stop { break; }
-        max_time = (4*3600) / r.nb_arg;
         if r.nb_arg <= r.step_arg { break; }
         if r.grounded[r.step_arg] != Label::UNDEC {
             //eprintln!("{}","IN GROUNDED".green());
@@ -43,9 +46,10 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         let file_path  = r.file_path.clone();
         let arg_name = if r.arg_names.is_empty() { arg_id.to_string() }
         else { r.arg_names[arg_id].clone() };
-        let start = Instant::now();
+        
         drop(r);
-        let child = Command::new(solver_path.clone())
+        
+        let mut child = Command::new(solver_path.clone())
         .arg("solve")
         .arg("-p")
         .arg("DC-CO")
@@ -56,23 +60,48 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .arg("-a")
         .arg(arg_name)
         .arg("--logging-level")
-        .arg("off").output().expect("shloud ");
-        let time = start.elapsed().as_secs();
+        .arg("off")
+        .stdout(Stdio::piped())
+        //.stderr(Stdio::piped())
+        .spawn()
+        .unwrap();
+    
+        let one_sec = Duration::from_secs(max_time);
+        let status_code = match child.wait_timeout(one_sec).unwrap() {
+            Some(status) => status.code(),
+            None => {
+                // child hasn't exited yet
+                child.kill().unwrap();
+                child.wait().unwrap().code()
+            }
+        };
 
-        if !child.status.success() || time > max_time as u64 {
+        if status_code != Some(0) {
             let mut r = job_lock.write().unwrap();
             r.stop = true;
+            break;
         }
-        if child.stdout.starts_with(b"YES") {
+        let mut buf = Vec::new();
+        //let mut buf_err = Vec::new();
+        let _  = child.stdout.unwrap().read_to_end(&mut buf);
+        //let _  = child.stderr.unwrap().read_to_end(&mut buf_err);
+        //println!("{}", status_code.unwrap());
+        let output = String::from_utf8(buf).unwrap();
+        //let err = String::from_utf8(buf_err).unwrap();
+        //println!("res : {}", output);
+        //println!("err : {}", err);
+
+        if output.starts_with("YES") {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::IN;
         }
-        else if child.stdout.starts_with(b"NO") {
+        else if output.starts_with("NO") {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::OUT;
         }
         
         //println!("output : {}", String::from_utf8(child.stdout).unwrap().trim());
+
     }
 }
 
