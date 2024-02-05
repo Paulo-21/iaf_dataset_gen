@@ -8,13 +8,13 @@ pub enum Format {
 
 pub fn get_input(file_path : &str, format : Format) -> (ArgumentationFramework, Vec<String>) {
     match format {
-        Format::APX => readingAPX(file_path),
-        Format::CNF => (readingCNF(file_path), Vec::new()),
+        Format::APX => reading_apx(file_path),
+        Format::CNF => (reading_cnf(file_path), Vec::new()),
         //Format::CNF => readingCNF_perf(file_path),
     }
 }
 
-pub fn readingCNF( file_path : &str) -> ArgumentationFramework {
+pub fn reading_cnf( file_path : &str) -> ArgumentationFramework {
     let contents = fs::read_to_string(file_path)
     .expect("Should have been able to read the file");
     let mut content_iter = contents.trim().split('\n');
@@ -24,7 +24,7 @@ pub fn readingCNF( file_path : &str) -> ArgumentationFramework {
     let mut af = ArgumentationFramework::new(nb_arg);
     for line in content_iter {
         if !line.starts_with('#') && (!line.trim().eq("")) {
-            let (attacker,target) = parseCNFAttackLine(line);
+            let (attacker,target) = parse_cnfattack_line(line);
             af.add_attack(attacker, target);
         }
     }
@@ -43,21 +43,14 @@ fn find_number_argument(file_path : &str) -> i32 {
     nb_arg
 }
 
-fn parseCNFAttackLine (line : &str) -> (i32,i32) {
+fn parse_cnfattack_line (line : &str) -> (i32,i32) {
     let mut a = line.split_ascii_whitespace();
     let att = a.next().unwrap().parse::<i32>().unwrap();
     let targ = a.next().unwrap().parse::<i32>().unwrap();
     (att,targ)
 }
-fn parseAPXAttackLine (line : &str) -> (i32,i32) {
-    let buff = line.strip_prefix("att(").unwrap();
-    let buff2 = buff.strip_suffix(").").unwrap();
-    let buff2 = buff2.replace(",", " ");
 
-    parseCNFAttackLine(&buff2)
-}
-
-pub fn readingAPX( file_path : &str) -> (ArgumentationFramework, Vec<String>) {
+pub fn reading_apx( file_path : &str) -> (ArgumentationFramework, Vec<String>) {
     let mut index = 1;
     let mut index_map = HashMap::new();
     let nb_arg = find_number_argument(file_path);

@@ -8,7 +8,6 @@ use std::thread;
 use std::thread::available_parallelism;
 use std::sync::{RwLock, Arc};
 use colored::Colorize;
-
 use crate::grounded::*;
 use crate::parser::*;
 
@@ -24,6 +23,7 @@ struct Job {
     grounded : Vec<Label>,
     nb_arg : usize,
     arg_names: Vec<String>,
+    stop : bool,
 }
 
 fn find_number_arg(file_name : &PathBuf) -> u32 {
@@ -43,6 +43,7 @@ fn find_number_arg(file_name : &PathBuf) -> u32 {
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
     loop {
         let mut r = job_lock.write().unwrap();
+        //if r.stop { break; }
         if r.nb_arg <= r.step_arg { break; }
         if r.grounded[r.step_arg] != Label::UNDEC {
             println!("{}","IN GROUNDED".green());
@@ -57,7 +58,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         else { r.arg_names[arg_id].clone() };
 
         drop(r);
-        let out = Command::new(solver_path.clone())
+        let child = Command::new(solver_path.clone())
         .arg("solve")
         .arg("-p")
         .arg("DC-CO")
@@ -68,20 +69,23 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .arg("-a")
         .arg(arg_name)
         .arg("--logging-level")
-        .arg("off")
-        .output()
-        .expect("failed to execute process");
-        if out.stdout.starts_with(b"YES") {
+        .arg("off").output().expect("shloud ");
+
+        if child.status.success() {
+            let mut r = job_lock.write().unwrap();
+            r.stop = true;
+        }
+        
+        if child.stdout.starts_with(b"YES") {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::IN;
         }
-        else if out.stdout.starts_with(b"NO") {
+        else if child.stdout.starts_with(b"NO") {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::OUT;
         }
         
-        println!("{}", String::from_utf8(out.stdout).unwrap());
-
+        //println!("output : {}", String::from_utf8(child.stdout).unwrap().trim());
     }
 }
 
@@ -112,7 +116,7 @@ fn main() {
         };
         println!("-----------------------------------------------");
         println!("{}", f.display());
-        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name};
+        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false};
         let job_lock = Arc::new(RwLock::new(job));
         let mut thread_join_handle = Vec::with_capacity(default_parallelism_approx);
         for _ in 0..default_parallelism_approx {
@@ -129,10 +133,11 @@ fn main() {
         }
         let mut res = String::with_capacity(af.nb_argument);
         let w = job_lock.write().unwrap();
-
+        if w.stop { continue; }
         for (i, arg) in w.grounded.iter().enumerate() {
             if *arg == Label::IN {
                 res.push_str(&i.to_string());
+                res.push(',');
             }
         }
         let mut res_path = PathBuf::from("result");
