@@ -58,7 +58,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .arg("--logging-level")
         .arg("off").output().expect("shloud ");
         let time = start.elapsed().as_secs();
-        
+
         if !child.status.success() || time > max_time as u64 {
             let mut r = job_lock.write().unwrap();
             r.stop = true;
@@ -120,7 +120,7 @@ fn main() {
         }
         let mut res = String::with_capacity(af.nb_argument);
         let w = job_lock.write().unwrap();
-        if w.stop { continue; }
+        if w.stop { drop(w); continue; }
         for (i, arg) in w.grounded.iter().enumerate() {
             if *arg == Label::IN {
                 res.push_str(&i.to_string());
