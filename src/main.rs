@@ -46,7 +46,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         //if r.stop { break; }
         if r.nb_arg <= r.step_arg { break; }
         if r.grounded[r.step_arg] != Label::UNDEC {
-            println!("{}","IN GROUNDED".green());
+            eprintln!("{}","IN GROUNDED".green());
             (*r).step_arg +=1;
             drop(r);
             continue;
