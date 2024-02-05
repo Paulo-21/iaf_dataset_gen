@@ -25,6 +25,7 @@ struct Job {
     nb_arg : usize,
     arg_names: Vec<String>,
     stop : bool,
+    error : bool,
 }
 
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
@@ -44,11 +45,12 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         let arg_id = r.step_arg;
         r.step_arg+=1;
         let file_path  = r.file_path.clone();
+        let file_path2  = r.file_path.clone();
         let arg_name = if r.arg_names.is_empty() { arg_id.to_string() }
         else { r.arg_names[arg_id].clone() };
+        let arg_name2 = arg_name.clone();
         
         drop(r);
-        
         let mut child = Command::new(solver_path.clone())
         .arg("solve")
         .arg("-p")
@@ -65,20 +67,24 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         //.stderr(Stdio::piped())
         .spawn()
         .unwrap();
-    
+        let start = Instant::now();
         let one_sec = Duration::from_secs(max_time);
         let status_code = match child.wait_timeout(one_sec).unwrap() {
             Some(status) => status.code(),
             None => {
                 // child hasn't exited yet
                 child.kill().unwrap();
+                //println!("{} {}", max_time, start.elapsed().as_secs());
                 child.wait().unwrap().code()
             }
         };
-
+        
         if status_code != Some(0) {
+            //println!("solve -p DC-CO -f {} -r apx -a {} --logging-level off",file_path2.display() , arg_name2);
+            //println!("{}", status_code.unwrap());
             let mut r = job_lock.write().unwrap();
             r.stop = true;
+            r.error = true;
             break;
         }
         let mut buf = Vec::new();
@@ -99,9 +105,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
             let mut r = job_lock.write().unwrap();
             r.grounded[arg_id] = Label::OUT;
         }
-        
-        //println!("output : {}", String::from_utf8(child.stdout).unwrap().trim());
-
+        //println!("output : {}", String::from_utf8(child.stdout).unwrap().trim())
     }
 }
 
@@ -131,7 +135,7 @@ fn main() {
         println!("-----------------------------------------------");
 
         if res_path.exists() { 
-            println!("{} {} ", f.display(), "already computed".yellow());
+            println!("{} {} ", f.display(), "already computed".cyan());
             continue; 
         }
         let (af, arg_name) = if f.ends_with("af") {
@@ -141,7 +145,7 @@ fn main() {
             get_input(f.to_str().unwrap(), Format::APX)
         };
         println!("{}", f.display());
-        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false};
+        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false, error : false};
         let job_lock = Arc::new(RwLock::new(job));
         let mut thread_join_handle = Vec::with_capacity(default_parallelism_approx);
         for _ in 0..default_parallelism_approx {
@@ -156,9 +160,13 @@ fn main() {
         for t in thread_join_handle {
             let _ = t.join();
         }
-        println!("{}", "done".green());
-        let mut res = String::with_capacity(af.nb_argument);
         let w = job_lock.write().unwrap();
+
+        if w.stop && !w.error { println!("{}", "Take Too much time".yellow()); }
+        else if w.stop && w.error { println!("{}", "Error from solver".red()); }
+        else { println!("{}", "done".green()); }
+
+        let mut res = String::with_capacity(af.nb_argument);
         if w.stop { drop(w); continue; }
         for (i, arg) in w.grounded.iter().enumerate() {
             if *arg == Label::IN {
@@ -166,9 +174,9 @@ fn main() {
                 res.push(',');
             }
         }
-
         let mut file = File::create(res_path).unwrap();
         file.write_all(res.as_bytes()).unwrap();
+        let _ = file.flush();
     }
     
 }
