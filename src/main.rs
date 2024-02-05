@@ -1,3 +1,4 @@
+use core::time;
 use std::io::Write;
 use std::io::Read;
 use std::fs::{self, File};
@@ -68,12 +69,14 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
         .spawn()
         .unwrap();
         let start = Instant::now();
+        let mut timeout = false;
         let one_sec = Duration::from_secs(max_time);
         let status_code = match child.wait_timeout(one_sec).unwrap() {
             Some(status) => status.code(),
             None => {
                 // child hasn't exited yet
                 child.kill().unwrap();
+                timeout = true;
                 //println!("{} {}", max_time, start.elapsed().as_secs());
                 child.wait().unwrap().code()
             }
@@ -84,7 +87,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf) {
             //println!("{}", status_code.unwrap());
             let mut r = job_lock.write().unwrap();
             r.stop = true;
-            r.error = true;
+            r.error = !timeout;
             break;
         }
         let mut buf = Vec::new();
