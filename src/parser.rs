@@ -1,4 +1,4 @@
-use std::{collections::HashMap, fs};
+use std::{collections::HashMap, fs, io::{BufRead, BufReader}};
 use crate::af::*;
 
 pub enum Format {
@@ -6,14 +6,28 @@ pub enum Format {
     CNF,
 }
 
-pub fn get_input(file_path : &str, format : Format) -> (ArgumentationFramework, Vec<String>) {
+pub fn get_input(file_path : &str, mut format : Format) -> (ArgumentationFramework, Vec<String>) {
+    let fl = get_first_line(file_path);
+    if fl.trim().starts_with("p af") {
+        format = Format::CNF;
+    }
     match format {
         Format::APX => reading_apx(file_path),
         Format::CNF => (reading_cnf(file_path), Vec::new()),
         //Format::CNF => readingCNF_perf(file_path),
     }
 }
+fn get_first_line(file_path : &str ) -> String {
+    let file = match fs::File::open(&file_path) {
+        Ok(file) => file,
+        Err(_) => panic!("Unable to read title from {:?}", &file_path),
+    };
+    let mut buffer = BufReader::new(file);
+    let mut first_line = String::new();
+    let _ = buffer.read_line(&mut first_line);
 
+    first_line
+}
 pub fn reading_cnf( file_path : &str) -> ArgumentationFramework {
     let contents = fs::read_to_string(file_path)
     .expect("Should have been able to read the file");
