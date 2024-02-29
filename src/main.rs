@@ -53,7 +53,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
         let file_path  = r.file_path.clone();
         let arg_name = if r.arg_names.is_empty() { (arg_id+1).to_string() }
         else { r.arg_names[arg_id].clone() };
-        let arg_n = arg_name.clone();
+        //let arg_n = arg_name.clone();
         drop(r);
         let t = solver_path.clone();
         let mut cmd = Command::new(t);
@@ -87,24 +87,21 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
                 // child hasn't exited yet
                 child.kill().unwrap();
                 timeout = true;
-                println!("timeout");
                 //println!("{} {}", max_time, start.elapsed().as_secs());
                 child.wait().unwrap().code()
             }
         };
         
         let mut buf = Vec::new();
-        let mut buf_err = Vec::new();
+        //let mut buf_err = Vec::new();
         let _  = child.stdout.unwrap().read_to_end(&mut buf);
-        let _  = child.stderr.unwrap().read_to_end(&mut buf_err);
+        //let _  = child.stderr.unwrap().read_to_end(&mut buf_err);
         //println!("{}", status_code.unwrap());
         let output = String::from_utf8(buf).unwrap();
-        let err = String::from_utf8(buf_err).unwrap();
+        //let err = String::from_utf8(buf_err).unwrap();
+        
         //println!("err : {}", err);
         if status_code != Some(0) {
-            println!("{}", arg_n);
-            println!("res : {}", output);
-            println!("res : {}", err);
             //println!("solve -p DC-CO -f {} -r apx -a {} --logging-level off",file_path2.display() , arg_name2);
             //println!("{}", status_code.unwrap());
             let mut r = job_lock.write().unwrap();
