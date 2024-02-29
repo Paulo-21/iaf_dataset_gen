@@ -29,18 +29,19 @@ struct Job {
     arg_names: Vec<String>,
     stop : bool,
     error : bool,
+    file_type : Format,
 }
 
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type : String) {
     let r = job_lock.read().unwrap();
     let max_time = (4*3600) / r.nb_arg as u64;
+    let format = r.file_type.clone();
     drop(r);
     loop {
         let mut r = job_lock.write().unwrap();
         if r.stop { break; }
         if r.nb_arg <= r.step_arg { break; }
         if r.grounded[r.step_arg] != Label::UNDEC {
-            //eprintln!("{}","IN GROUNDED".green());
             (*r).step_arg +=1;
             drop(r);
             continue;
@@ -52,22 +53,38 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
         else { r.arg_names[arg_id].clone() };
         
         drop(r);
-        let mut child = Command::new(solver_path.clone())
-        .arg("solve")
-        .arg("-p")
-        .arg(&problem_type)
-        .arg("-f")
-        .arg(file_path)
-        .arg("-r")
-        .arg("apx")
-        .arg("-a")
-        .arg(arg_name)
-        .arg("--logging-level")
-        .arg("off")
-        .stdout(Stdio::piped())
-        //.stderr(Stdio::piped())
-        .spawn()
-        .unwrap();
+        let t = solver_path.clone();
+        let mut child = if format == Format::APX {
+            Command::new(t)
+            .arg("solve")
+            .arg("-p")
+            .arg(&problem_type)
+            .arg("-f")
+            .arg(file_path)
+            .arg("-r")
+            .arg("apx")   
+            .arg("-a")
+            .arg(arg_name)
+            .arg("--logging-level")
+            .arg("off")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap() 
+        }else {
+            Command::new(t)
+            .arg("solve")
+            .arg("-p")
+            .arg(&problem_type)
+            .arg("-f")
+            .arg(file_path)
+            .arg("-a")
+            .arg(arg_name)
+            .arg("--logging-level")
+            .arg("off")
+            .stdout(Stdio::piped())
+            .spawn()
+            .unwrap()
+        };
         //let start = Instant::now();
         let mut timeout = false;
         let one_sec = Duration::from_secs(max_time);
@@ -148,14 +165,14 @@ fn main() {
             println!("{} {} ", f.display(), "already computed".cyan());
             continue; 
         }
-        let (af, arg_name) = if f.ends_with("af") {
+        let (af, arg_name, format) = if f.ends_with("af") {
             get_input(f.to_str().unwrap(), Format::CNF)
         }
         else {
             get_input(f.to_str().unwrap(), Format::APX)
         };
         println!("{}", f.display());
-        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false, error : false};
+        let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false, error : false, file_type : format};
         let job_lock = Arc::new(RwLock::new(job));
         let mut thread_join_handle = Vec::with_capacity(default_parallelism_approx);
         for _ in 0..default_parallelism_approx {

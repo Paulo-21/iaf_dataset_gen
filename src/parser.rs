@@ -1,19 +1,23 @@
 use std::{collections::HashMap, fs, io::{BufRead, BufReader}};
 use crate::af::*;
 
+#[derive(Clone, Copy, PartialEq)]
 pub enum Format {
     APX,
     CNF,
 }
 
-pub fn get_input(file_path : &str, mut format : Format) -> (ArgumentationFramework, Vec<String>) {
+pub fn get_input(file_path : &str, mut format : Format) -> (ArgumentationFramework, Vec<String>, Format) {
     let fl = get_first_line(file_path);
     if fl.trim().starts_with("p af") {
         format = Format::CNF;
     }
     match format {
-        Format::APX => reading_apx(file_path),
-        Format::CNF => (reading_cnf(file_path), Vec::new()),
+        Format::APX =>  {
+            let res = reading_apx(file_path);
+            (res.0, res.1, Format::APX)
+        },
+        Format::CNF => (reading_cnf(file_path), Vec::new(), Format::CNF),
     }
 }
 fn get_first_line(file_path : &str ) -> String {
