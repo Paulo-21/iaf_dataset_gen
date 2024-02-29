@@ -1,4 +1,5 @@
 use std::cmp::max;
+use std::io::stderr;
 use std::io::Write;
 use std::io::Read;
 use std::fs::{self, File};
@@ -34,9 +35,9 @@ struct Job {
 
 fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type : String) {
     let r = job_lock.read().unwrap();
-    let max_time = (4*3600) / r.nb_arg as u64;
+    let max_time = (7*3600) / r.nb_arg as u64;
     let format = r.file_type.clone();
-    let kissat = true;
+    let kissat = false;
     drop(r);
     loop {
         let mut r = job_lock.write().unwrap();
@@ -50,9 +51,9 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
         let arg_id = r.step_arg;
         r.step_arg+=1;
         let file_path  = r.file_path.clone();
-        let arg_name = if r.arg_names.is_empty() { arg_id.to_string() }
+        let arg_name = if r.arg_names.is_empty() { (arg_id+1).to_string() }
         else { r.arg_names[arg_id].clone() };
-        
+        let arg_n = arg_name.clone();
         drop(r);
         let t = solver_path.clone();
         let mut cmd = Command::new(t);
@@ -73,6 +74,7 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
             .arg("../kissat/build/kissat");
         }
         let mut child = cmd.stdout(Stdio::piped())
+        .stderr(Stdio::piped())
             .spawn()
             .unwrap();
         
@@ -85,21 +87,24 @@ fn create_data(job_lock : Arc<RwLock<Job>>, solver_path : PathBuf, problem_type 
                 // child hasn't exited yet
                 child.kill().unwrap();
                 timeout = true;
+                println!("timeout");
                 //println!("{} {}", max_time, start.elapsed().as_secs());
                 child.wait().unwrap().code()
             }
         };
         
         let mut buf = Vec::new();
-        //let mut buf_err = Vec::new();
+        let mut buf_err = Vec::new();
         let _  = child.stdout.unwrap().read_to_end(&mut buf);
-        //let _  = child.stderr.unwrap().read_to_end(&mut buf_err);
+        let _  = child.stderr.unwrap().read_to_end(&mut buf_err);
         //println!("{}", status_code.unwrap());
         let output = String::from_utf8(buf).unwrap();
-        //let err = String::from_utf8(buf_err).unwrap();
-        //println!("res : {}", output);
+        let err = String::from_utf8(buf_err).unwrap();
         //println!("err : {}", err);
         if status_code != Some(0) {
+            println!("{}", arg_n);
+            println!("res : {}", output);
+            println!("res : {}", err);
             //println!("solve -p DC-CO -f {} -r apx -a {} --logging-level off",file_path2.display() , arg_name2);
             //println!("{}", status_code.unwrap());
             let mut r = job_lock.write().unwrap();
@@ -149,8 +154,8 @@ fn main() {
         let temp = f.clone();
         let file_name = temp.to_str().unwrap().split(&['\\', '/']);
         res_path = res_path.join(file_name.last().unwrap());
-        println!("{}", res_path.display());
         println!("-----------------------------------------------");
+        println!("{}", res_path.display());
 
         if res_path.exists() {
             println!("{} {} ", f.display(), "already computed".cyan());
@@ -163,6 +168,7 @@ fn main() {
             get_input(f.to_str().unwrap(), Format::APX)
         };
         println!("{}", f.display());
+        //let step = if format == Format::CNF {1}else {0};
         let job = Job{file_path : f, step_arg: 0, grounded : solve(&af), nb_arg : af.nb_argument, arg_names : arg_name, stop:false, error : false, file_type : format};
         let job_lock = Arc::new(RwLock::new(job));
         let mut thread_join_handle = Vec::with_capacity(default_parallelism_approx);
