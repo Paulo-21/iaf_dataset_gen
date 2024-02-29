@@ -14,7 +14,6 @@ pub fn get_input(file_path : &str, mut format : Format) -> (ArgumentationFramewo
     match format {
         Format::APX => reading_apx(file_path),
         Format::CNF => (reading_cnf(file_path), Vec::new()),
-        //Format::CNF => readingCNF_perf(file_path),
     }
 }
 fn get_first_line(file_path : &str ) -> String {
